@@ -179,94 +179,11 @@ def execute_hungarian_match(batch, sensor_type, fusion_manager, geo_transformer)
             # 5. 计算观测点与外推预测点之间的真实残差距离
             dist = math.sqrt((pred_x - obs['x_m']) ** 2 + (pred_y - obs['y_m']) ** 2)
 
-            # 【新增】粗阈值过滤：超过粗阈值的设置为极大值，避免匈牙利算法匹配
-            if sensor_type == "radar":
-                coarse_gate = 300.0  # 雷达粗阈值：300m
-            elif sensor_type == "bds":
-                coarse_gate = 500.0 + (8.0 * dt_seconds)  # 北斗粗阈值：给较大余量
-            else:
-                coarse_gate = 500.0
-
-            if dist > coarse_gate:
-                cost_matrix[i, j] = float('inf')  # 设为无穷大，匈牙利算法会避免匹配
-            else:
-                cost_matrix[i, j] = dist
-
-    # 调试信息：检查成本矩阵
-    print(f"Debug - {sensor_type} 匹配调试信息:")
-    print(f"  骨干航迹数量: {len(backbones)}")
-    print(f"  批次数据数量: {len(batch)}")
-    print(f"  成本矩阵形状: {cost_matrix.shape}")
-    print(f"  成本矩阵中inf的数量: {np.isinf(cost_matrix).sum()}")
-    print(f"  成本矩阵中有效值的数量: {np.isfinite(cost_matrix).sum()}")
-    
-    # 如果全是inf值，则跳过匹配
-    if np.isinf(cost_matrix).all():
-        print(f"  警告：所有距离都超过阈值，跳过匹配")
-        return
-    
-    # 查看具体的成本矩阵值
-    print(f"  成本矩阵中的有效值: {cost_matrix[np.isfinite(cost_matrix)]}")
-    
-    # 检查是否有任何有效的匹配机会
-    if np.isfinite(cost_matrix).sum() == 0:
-        print(f"  警告：没有有效的匹配机会，跳过匹配")
-        return
-    
-    # 检查是否有任何值满足阈值要求
-    if sensor_type == "radar":
-        threshold = 200.0  # 雷达最终阈值
-    elif sensor_type == "bds":
-        threshold = 300.0 + (6.0 * dt_seconds)  # 北斗最终阈值
-    else:
-        threshold = 500.0
-    
-    valid_within_threshold = cost_matrix[cost_matrix <= threshold]
-    if len(valid_within_threshold) == 0:
-        print(f"  警告：没有距离值满足阈值要求({threshold}m)，跳过匹配")
-        return
-    
-    print(f"  满足阈值的有效值数量: {len(valid_within_threshold)}")
-    
-    # 检查是否至少有一个骨干航迹和一个观测点，并且至少有一个有效匹配
-    if len(backbones) == 0 or len(batch) == 0:
-        print(f"  警告：没有骨干航迹({len(backbones)})或观测点({len(batch)})，跳过匹配")
-        return
-    
-    # 检查是否有任何有效的匹配机会
-    if np.isfinite(cost_matrix).sum() == 0:
-        print(f"  警告：没有有效的匹配机会，跳过匹配")
-        return
-    
-    # 检查是否有任何值满足阈值要求
-    if sensor_type == "radar":
-        threshold = 200.0  # 雷达最终阈值
-    elif sensor_type == "bds":
-        threshold = 300.0 + (6.0 * dt_seconds)  # 北斗最终阈值
-    else:
-        threshold = 500.0
-    
-    valid_within_threshold = cost_matrix[cost_matrix <= threshold]
-    if len(valid_within_threshold) == 0:
-        print(f"  警告：没有距离值满足阈值要求({threshold}m)，跳过匹配")
-        return
-    
-    print(f"  满足阈值的有效值数量: {len(valid_within_threshold)}")
-    
-    # 创建一个临时的成本矩阵，将超过阈值的值设为无穷大
-    temp_cost_matrix = cost_matrix.copy()
-    temp_cost_matrix[cost_matrix > threshold] = float('inf')
-    
-    # 检查临时矩阵是否可行 - 确保每行和每列至少有一个有限值
-    row_has_finite = np.any(np.isfinite(temp_cost_matrix), axis=1)
-    col_has_finite = np.any(np.isfinite(temp_cost_matrix), axis=0)
-    
-    if not np.all(row_has_finite) or not np.all(col_has_finite):
-        print(f"  警告：矩阵结构不可行（某些行或列全是无穷大），跳过匹配")
-        return
+            # 设置成本矩阵值
+            cost_matrix[i, j] = dist
     
     # 执行匈牙利算法
-    row_ind, col_ind = linear_sum_assignment(temp_cost_matrix)
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
     for b_idx, obs_idx in zip(row_ind, col_ind):
         # 计算真实外推差
@@ -274,13 +191,8 @@ def execute_hungarian_match(batch, sensor_type, fusion_manager, geo_transformer)
         obs_ts = batch[obs_idx]['recvTs']
         dt_seconds = max((obs_ts - trk_ts) / 1000.0, 0.0)
 
-        # 动态波门计算
-        if sensor_type == "radar":
-            gate_dist = 200.0  # 【修改】雷达最终阈值：200m
-        elif sensor_type == "bds":
-            gate_dist = 300.0 + (6.0 * dt_seconds)
-        else:
-            gate_dist = 500.0
+        # 动态波门计算 - 统一设为500m
+        gate_dist = 500.0
 
         # 执行截获判定
         if cost_matrix[b_idx, obs_idx] < gate_dist:
