@@ -178,9 +178,12 @@ def execute_hungarian_match(batch, sensor_type, fusion_manager, geo_transformer)
 
             # 5. 计算观测点与外推预测点之间的真实残差距离
             dist = math.sqrt((pred_x - obs['x_m']) ** 2 + (pred_y - obs['y_m']) ** 2)
+            if dist < 400 :
+                cost_matrix[i, j] = dist
+            else :
+                cost_matrix[i, j] = 9999
 
-            # 设置成本矩阵值
-            cost_matrix[i, j] = dist
+
     
     # 执行匈牙利算法
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
@@ -192,7 +195,7 @@ def execute_hungarian_match(batch, sensor_type, fusion_manager, geo_transformer)
         dt_seconds = max((obs_ts - trk_ts) / 1000.0, 0.0)
 
         # 动态波门计算 - 统一设为500m
-        gate_dist = 500.0
+        gate_dist = 500.0  # 匈牙利匹配后500m过滤阈值
 
         # 执行截获判定
         if cost_matrix[b_idx, obs_idx] < gate_dist:

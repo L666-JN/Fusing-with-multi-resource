@@ -164,6 +164,7 @@ cython_debug/
 .vscode/
 
 # Custom
+Goose/
 data/
 *.csv
 *.xlsx
