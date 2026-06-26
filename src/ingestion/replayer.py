@@ -79,7 +79,7 @@ class LocalDataReplayer:
             # 若存在时间差，则触发物理休眠机制以模拟网络流
             if delta_ms > 0:
                 sleep_time = (delta_ms / 1000.0) / self.speed_factor
-                #time.sleep(sleep_time)
+                time.sleep(sleep_time)
 
             last_ts = current_ts
             yield item

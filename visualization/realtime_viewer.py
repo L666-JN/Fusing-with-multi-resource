@@ -22,7 +22,8 @@ def run_realtime_monitor():
     print("请确保主程序 main.py 正在运行并不断生成数据。按 Ctrl+C 退出监控。")
 
     # 定义标准的 CSV 列名，确保代码能准确提取最后面的 source 字段
-    columns = ['timestamp', 'mmsi', 'latitude', 'longitude', 'speed', 'heading', 'course', 'source']
+    columns = ['timestamp', 'mmsi', 'latitude', 'longitude', 'speed',
+               'heading', 'course', 'source', 'radar_track_number', 'radar_speed']
 
     while True:
         if not os.path.exists(csv_path):
